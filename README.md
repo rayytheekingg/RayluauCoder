@@ -44,10 +44,10 @@ To get a new version later, run:
 claude plugin update rayluaucoder@rayluau
 ```
 
-To try it for one session without installing it, download the zip from the [latest release](https://github.com/rayytheekingg/RayluauCoder/releases/latest), then run:
+To try it for one session without installing it, download the [repo zip](https://github.com/rayytheekingg/RayluauCoder/archive/refs/heads/main.zip) and unzip it, then run:
 
 ```bash
-claude --plugin-dir "/path/to/RayluauCoder.zip"
+claude --plugin-dir "/path/to/RayluauCoder-main"
 ```
 
 ## Use
