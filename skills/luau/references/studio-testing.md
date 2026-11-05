@@ -10,7 +10,7 @@ If the tools are missing, tell the user to run `scripts/run setup` for connectio
 
 1. **Test in a playtest.** Changes made in the Server and Client contexts disappear when the playtest stops. Changes made in the Edit context stay in the place.
 2. **Don't change the place unless asked.** Don't use `execute_luau` to write in Edit, `multi_edit`, or `insert_asset` for testing. Never save or publish.
-3. **Never touch real data.** With API access on, Studio can write to real DataStores. Replace stores with `templates/code/MockDataStore.luau`, even in a test place.
+3. **Never touch real data.** With API access on, Studio can write to real DataStores. Replace stores with `templates/code/MockDataStore.luau`, even in a test place. A playtest also runs **every script already in the place**, so use `script_grep` for `GetDataStore`, `ProcessReceipt`, and `Teleport` first. If the place's own scripts use real services, or the place isn't blank, tell the user what will run, and ask before starting. Offer a blank test place instead.
 4. **Avoid real side effects.** Don't test with real purchases, teleports, cross-server messages, Open Cloud calls, or web requests.
 5. **Tell the user first.** A playtest takes over their Studio window. Say what you're about to run.
 6. **Don't interrupt.** If `get_studio_state` doesn't show Edit mode, ask before stopping the playtest.
@@ -28,8 +28,9 @@ Avoid these tools unless the user asks: `subagent`, `generate_*`, `open_cloud_in
 | `list_roblox_studios` | Get the `studio_id` that other tools need. It can be empty for a few seconds after connecting |
 | `get_studio_state` | See the mode, and which contexts are available |
 | `start_stop_play` | Start or stop a solo playtest. Wait until the state shows Server and Client |
-| `execute_luau` | Run code with `datamodel_type` set to `Edit`, `Server`, or `Client`. Returns the code's `return` value |
+| `execute_luau` | Run code with `datamodel_type` set to `Edit`, `Server`, or `Client`. Returns the code's `return` value. It can't read `NotScriptable` properties, such as `Workspace.SignalBehavior` |
 | `get_console_output` | Read Output. Check it for errors after every test |
+| `script_grep` | Search script text. During a playtest it sees client scripts only, so run it in Edit mode, or a clean result proves nothing about server scripts |
 | `search_game_tree`, `inspect_instance`, `script_search`, `script_read`, `script_grep` | Read the place |
 | `character_navigation`, `user_keyboard_input`, `user_mouse_input` | Simulate the player during play |
 | `screen_capture` | Capture an edit-time view, which can help check visible layout |
@@ -42,7 +43,7 @@ Avoid these tools unless the user asks: `subagent`, `generate_*`, `open_cloud_in
    - If it's already in the place and up to date, start the playtest and it runs.
    - If it's only in files, load it into the playtest as shown below.
    - With Rojo, compare the place with the files, because Studio may hold an older copy.
-4. Call `get_studio_state`, tell the user, and start the playtest.
+4. Call `get_studio_state`, and search the place's scripts for real services. Tell the user, and start the playtest only if safety rule 3 allows it. Existing scripts can move the player or change state, so don't assume a test starts from a clean game.
 5. Run tests in the `Server` and `Client` contexts.
 6. Read results and `get_console_output`.
 7. Stop the playtest and confirm Edit mode.

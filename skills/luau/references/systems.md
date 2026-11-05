@@ -119,13 +119,20 @@ Client state is only a display copy. The server's state decides what is true.
 | Technique | Choose when | Avoid when | Cost |
 | --- | --- | --- | --- |
 | `Workspace:Raycast` | Bullets, line of sight, ground checks | Thick projectiles. Rays have a 15,000 stud limit | Low |
-| `Blockcast`, `Spherecast` | Thick projectiles and sweeps | A ray is enough | Moderate |
+| `Blockcast`, `Spherecast`, `Shapecast` | Thick projectiles and sweeps | A ray is enough | Moderate |
 | `GetPartBoundsInBox`, `GetPartBoundsInRadius`, `GetPartsInPart` | Melee and area damage | Long, thin checks | Moderate. Use filters |
 | `Touched` | Simple non-competitive contact | Combat, because clients can trigger it for parts they control | Low, but unreliable for fairness |
 | Server validation | Almost all combat | No exceptions in multiplayer | Medium. Check cooldown, weapon, distance, line of sight, and an allowance for latency |
-| [Server authority](https://create.roblox.com/docs/scripting/security/security-tactics) | Competitive shooters, racing, sports, and combat | Casual games | High. It changes the input and prediction design |
+| [Server authority](https://create.roblox.com/docs/projects/server-authority) | Competitive shooters, racing, sports, and combat, where flying and speed hacks must be impossible | Casual games, or games that depend on Tools, which aren't fully supported yet | High. Beta, and it changes the input, simulation, and prediction design |
 
 Use `CanQuery = false` on parts that should not be hit. With streaming, clients may not have distant parts, so do final hit decisions on the server.
+
+Setting `Workspace.AuthorityMode` to `Server` also sets next-generation replication, the Input Action System, deferred events, fixed simulation, and streaming. Game logic then moves into a module that runs on both sides inside `RunService:BindToSimulation`:
+
+- Use `InputAction` for simulation input, and `time()` for simulation timing.
+- Don't call `Destroy` or change `Parent` inside bound functions.
+- Don't keep `AnimationTrack` references across frames. Use `Animator:GetTrackByAnimationId`.
+- Make visual effects able to undo themselves, because mispredictions get corrected.
 
 ## NPCs
 
@@ -169,6 +176,23 @@ Rules:
 - Return `PurchaseGranted` only after the grant is saved. Otherwise return `NotProcessedYet`, and Roblox tries again when the player next joins.
 - Roblox doesn't keep per-player product history for you, so store it yourself if you need it.
 - Never use `PromptProductPurchaseFinished` to grant items.
+- Paid random items must check `PolicyService` and show odds. See `security-and-data.md`.
+- Start from `templates/code/ProductReceipts.luau`.
+
+## Input, chat, audio, and movement
+
+**Default:** the newest built-in option listed for each. Everything here is built in.
+
+| Need | Option | Choose when | Avoid when | Cost |
+| --- | --- | --- | --- | --- |
+| Input | [Input Action System](https://create.roblox.com/docs/input/input-action-system) | New games, cross-device controls, or server authority | Simple raw checks | Low. Needs `Workspace.PlayerScriptsUseInputActionSystem` for PlayerScripts |
+| Input | `UserInputService` | Raw input, device type, and mouse position | Actions that need all devices and contexts | Low. You handle each device |
+| Chat | [`TextChatService`](https://create.roblox.com/docs/chat/in-experience-text-chat) | All chat. It is filtered for you | Not applicable. Don't build chat on your own text filtering | Low. Commands use `TextChatCommand` |
+| Audio | [`AudioPlayer` and audio objects](https://create.roblox.com/docs/audio/objects) | Effects chains, voice, and dynamic mixing | Simple one-shot sounds | Medium. You connect objects with wires |
+| Audio | `Sound` | Simple sounds | Dynamic effects | Low |
+| Movement | `LinearVelocity`, `AlignPosition`, and other constraints | Ongoing physics movement | A single initial push | Low. Set `BasePart.AssemblyLinearVelocity` for a push |
+| Characters | [Character Controller Library](https://create.roblox.com/docs/characters/character-controller-library) | Custom character abilities | Standard characters that already work | Medium. Check that it fits your Studio version |
+| Matchmaking | [Built-in matchmaking](https://create.roblox.com/docs/matchmaking) | Tuning which servers players join | Your own match rules between places | Low. Configured with server scoring |
 
 ## Tooling
 

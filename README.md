@@ -68,6 +68,7 @@ Try these prompts:
 | `/rayluau-choose <description>` | Recommends systems, with the reason, tradeoff, and fallback |
 | `/rayluau-neat [path]` | Tidies requested code without changing what it does |
 | `/rayluau-test [path or feature]` | Tests code in a Studio playtest, without changing your place |
+| `/rayluau-maintain [--links]` | Checks the plugin against the latest Roblox docs, and lists new pages to read |
 
 Claude Code may show these commands as `/rayluaucoder:rayluau-new` and so on.
 
@@ -91,6 +92,10 @@ bash scripts/run api-lookup Part.Anchored
 
 ```bash
 bash scripts/run setup
+```
+
+```bash
+bash scripts/run maintain
 ```
 
 ## Neat code
@@ -165,7 +170,7 @@ The full list, connection steps, and plugin safety rules are in `skills/luau/ref
 - `luau-lsp` needs a sourcemap to resolve requires and child instance paths such as `ReplicatedStorage.Shared.Config`. Without one, `check` skips those references and reports how many. With one, broken `require` paths are reported, but a misspelled child used outside `require` can still pass.
 - `neat` uses patterns, not a full parser. It can miss problems or flag a rare false positive. Use `-- neat: ignore` for those.
 - The built-in deprecated-API scan looks for patterns only. It does not check syntax or types.
-- `api-lookup` covers engine classes, members, and enums. Libraries and data types such as `task` and `Vector3` return a docs link instead.
+- `api-lookup` uses the live Studio API for classes and enums, and an index of Roblox's docs for libraries, data types, and globals. The index is refreshed by `maintain`.
 - The system status in `systems.md` was checked on 2026-11-04 and will age. Recheck it after 6 months.
 - The `check` and `neat` scripts don't run your game. Use `/rayluau-test` or test in Roblox Studio yourself.
 - `/rayluau-test` runs one player. It can't prove behaviour that needs several players, real DataStores, purchases, teleports, phones, or real network conditions.
@@ -190,11 +195,11 @@ These files download on first use, and are stored in `%LOCALAPPDATA%\rayluaucode
 
 | File | Source | Size | Used by |
 | --- | --- | --- | --- |
-| Roblox API dump | `setup.rbxcdn.com` | About 4.4 MB | `api-lookup`, and the `luau-analyze` fallback |
+| Roblox API dump, for the current Studio version | `setup.rbxcdn.com`, version from `clientsettings.roblox.com` | About 8.3 MB | `api-lookup`, and `check` |
 | Roblox type definitions | The `luau-lsp` GitHub repo | About 0.7 MB | `check`, when `luau-lsp` is installed |
 
 Set `RAYLUAU_CACHE` to use another folder. Refresh them with `bash scripts/run api-lookup --update`.
 
 ## License
 
-MIT. Roblox is a trademark of Roblox Corporation. This project is not affiliated with or endorsed by Roblox or Anthropic.
+MIT. See `NOTICE.md` for the Roblox documentation data this project includes. Roblox is a trademark of Roblox Corporation. This project is not affiliated with or endorsed by Roblox.or Anthropic.

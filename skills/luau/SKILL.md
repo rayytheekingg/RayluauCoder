@@ -17,8 +17,11 @@ Write Roblox code that is secure, typed, cleaned up, and checked. Never guess an
 | `RUN check <path>` | Run the type checker, selene, stylua, neat, and the deprecated-API scan |
 | `RUN neat <path>` | Check style rules. `--fix` runs StyLua only |
 | `RUN setup` | Print install steps for missing tools |
+| `RUN maintain` | Refresh the docs index, and audit this plugin against Roblox's docs. Add `--links` to check links |
 
-`api-lookup` exit codes: 0 found, 1 not found, 2 deprecated, 3 outside the dump, 4 could not get the dump.
+`api-lookup` also takes libraries, data types, and globals, such as `task.wait` and `Vector3.new`. It uses the live Studio API, and shows what replaces a deprecated API.
+
+`api-lookup` exit codes: 0 found, 1 not found, 2 deprecated, 4 could not get the dump.
 `check` exit codes: 0 pass, 1 problems, 2 incomplete.
 `neat` exit codes: 0 neat, 1 findings, 2 path or config error, 3 `--fix` needs StyLua.
 
@@ -81,10 +84,17 @@ Everything in `ReplicatedStorage` can be read by exploiters. Keep secrets and se
 
 - Treat every remote argument as hostile. Annotate it as `unknown` until validated.
 - Validate in this order: rate limit, types, allowed values, game rules, then act.
-- Reject `NaN` and infinite numbers.
+- Reject `NaN` and infinite numbers with `math.isfinite`.
+- Check that an Instance argument really is one, with the expected class and location.
 - The server owns prices, currency, damage, cooldowns, inventory, and rewards.
 - The client sends what it wants, such as an item ID. It never sends a price or a result.
-- Check distance on the server for interactions and combat.
+- Check distance on the server for interactions and combat. Repeat checks for `ProximityPrompt`, `ClickDetector`, and `Touched`, which clients can trigger.
+
+### Meet platform rules
+
+- Filter displayed text you don't fully control on the server, using `templates/code/FilterText.luau`. Chat through `TextChatService` is filtered for you.
+- If Robux can lead to a random reward, check `PolicyService` for each player and show the odds first.
+- Delete personal data when right-to-be-forgotten requests arrive.
 
 ### Handle data failures
 
@@ -95,6 +105,7 @@ Everything in `ReplicatedStorage` can be read by exploiters. Keep secrets and se
 - If a load fails, do not save defaults over the player's real data.
 - Use stable user IDs in keys, never display names.
 - Use session locks for trading and other duplication-sensitive data.
+- Grant developer products through `templates/code/ProductReceipts.luau`: once per `PurchaseId`, and report success only after saving.
 
 ### Clean up
 
@@ -109,6 +120,8 @@ Everything in `ReplicatedStorage` can be read by exploiters. Keep secrets and se
 - Use `:Connect`, `:Destroy`, `:PivotTo`, `workspace:Raycast`, and `Animator:LoadAnimation`.
 - Get services with `game:GetService`.
 - Set `Parent` last when creating an instance.
+- Check method names from memory or old tutorials with `api-lookup`, because many now have `Async` replacements.
+- Expect deferred events: handlers run after the current code yields, not during the fire.
 
 ### Type where practical
 
@@ -129,7 +142,7 @@ Everything in `ReplicatedStorage` can be read by exploiters. Keep secrets and se
 
 ### Keep code neat
 
-New and changed code must pass `neat` before the work is called finished.
+New and changed code must pass `neat` and the quality bar in `references/code-style.md` before the work is called finished.
 
 - Use clear names, small functions, early returns, and the standard file order.
 - Explain why in comments, not what.

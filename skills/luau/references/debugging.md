@@ -36,7 +36,7 @@ Exact wording can change. Match on the meaning.
 | `The current thread cannot ...` or `lacking capability` | Security level is too low | `api-lookup` security level. Plugin-only APIs do not work in game scripts |
 | `Script timeout: exhausted allowed execution time` | A loop ran without yielding | Add a yield, fix the exit condition, or split the work |
 | `stack overflow` | Unbounded recursion, often a `__index` or property change loop | The repeating stack lines |
-| `Maximum event re-entrancy depth exceeded` | An event handler triggers itself | Add a guard, or avoid setting the watched property |
+| `Maximum event re-entrancy depth exceeded` | Events keep firing each other, past a depth of 10 | Add a guard, or avoid setting the watched property |
 | `cannot resume dead coroutine` | A finished thread was resumed | Thread lifecycle. Do not resume threads twice |
 | `Remote event invocation queue exhausted` | A remote has no listener, and messages piled up | Connect the handler earlier, or fire less |
 | `Http requests are not enabled` | HTTP is disabled | Game Settings, then Security. It only works from the server |
@@ -46,10 +46,15 @@ Exact wording can change. Match on the meaning.
 | Error | Meaning | Action |
 | --- | --- | --- |
 | `You must publish this place to the web` | Place is not published | Publish it |
-| `StudioAccessToApisNotAllowed` | Studio API access is off | Turn on "Enable Studio Access to API Services" |
-| `10x` | Invalid request, such as a bad key or value | Fix the code. Do not retry |
-| `30x` or "added to queue" | Throttled | Reduce request rate, and retry later with backoff |
-| `50x` | Temporary service failure or corrupted result | Retry with backoff. Read the docs for that code |
+| `403`, or `StudioAccessToApisNotAllowed` | Studio API access is off | Turn on "Enable Studio Access to API Services". Do not retry |
+| `101` to `107` | Invalid request, such as a bad key, or a value that's too large or can't be saved | Fix the code. Do not retry |
+| `511` to `513` | Invalid metadata or user IDs | Fix the code. Do not retry |
+| `509` | Writes are blocked in this environment | Do not retry |
+| `301` to `306`, or "added to queue" | A request queue is full, at 30 requests | Reduce the request rate, then retry later |
+| `401`, `402` | The experience is shutting down | Finish what you can in `BindToClose` |
+| `502` | API Services rejected the request | Retry with backoff |
+| `404`, `501`, `503`, `504`, `505` | The response couldn't be read, and the data may be corrupted | Retry with backoff. If it persists, inspect the key in Data Stores Manager |
+| Names ending in `Throttled` | A budget was exceeded for the experience, server, store, or key | Back off, and reduce requests |
 
 ## Tools
 

@@ -11,11 +11,27 @@ local MAX_ATTEMPTS = 5
 local BASE_RETRY_SECONDS = 1
 local MAX_RETRY_SECONDS = 16
 local AUTOSAVE_SECONDS = 180
+-- Another attempt can't fix these: invalid requests, Studio API access turned off, or writes being blocked.
+local PERMANENT_ERROR_CODES: { [string]: boolean } = {
+	["101"] = true,
+	["102"] = true,
+	["103"] = true,
+	["104"] = true,
+	["105"] = true,
+	["106"] = true,
+	["107"] = true,
+	["403"] = true,
+	["509"] = true,
+	["511"] = true,
+	["512"] = true,
+	["513"] = true,
+}
 
 export type Data = {
 	revision: number,
 	coins: number,
 	owned: { [string]: boolean },
+	purchaseIds: { [string]: boolean },
 }
 
 local store = DataStoreService:GetDataStore(STORE_NAME)
@@ -33,11 +49,17 @@ local function defaultData(): Data
 		revision = 0,
 		coins = 0,
 		owned = {},
+		purchaseIds = {},
 	}
 end
 
 local function keyFor(userId: number): string
 	return `player_{userId}`
+end
+
+local function isPermanentError(message: unknown): boolean
+	local code = string.match(tostring(message), "^(%d+):")
+	return code ~= nil and PERMANENT_ERROR_CODES[code] == true
 end
 
 local function withRetries<T>(label: string, operation: () -> T): (boolean, T?)
@@ -48,8 +70,7 @@ local function withRetries<T>(label: string, operation: () -> T): (boolean, T?)
 		end
 		warn(`{label} failed on attempt {attempt}/{MAX_ATTEMPTS}: {result}`)
 
-		-- 10x errors mean the request is invalid, so another attempt cannot succeed.
-		if attempt == MAX_ATTEMPTS or string.match(tostring(result), "^10%d") then
+		if attempt == MAX_ATTEMPTS or isPermanentError(result) then
 			break
 		end
 		local delaySeconds = math.min(BASE_RETRY_SECONDS * 2 ^ (attempt - 1), MAX_RETRY_SECONDS)

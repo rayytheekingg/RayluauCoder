@@ -47,18 +47,18 @@ BEFORE_IF_EXPRESSION = {
     "==", "~=", "<", ">", "<=", ">=", "+=", "-=", "*=", "/=", "%=", "^=", "..=", "//=", "//", "::",
 }
 
-SERVICE_LINE = re.compile(r"^\s*local\s+(\w+)\s*(?::[^=]+)?=\s*game:GetService\(\s*[\"'](\w+)[\"']")
-REQUIRE_LINE = re.compile(r"^\s*local\s+(\w+)\s*(?::[^=]+)?=\s*require\(")
+SERVICE_LINE = re.compile(r"^\s*(?:local|const)\s+(\w+)\s*(?::[^=]+)?=\s*game:GetService\(\s*[\"'](\w+)[\"']")
+REQUIRE_LINE = re.compile(r"^\s*(?:local|const)\s+(\w+)\s*(?::[^=]+)?=\s*require\(")
 ALIAS_LINE = re.compile(
-    r"^\s*local\s+\w+\s*(?::[^=]+)?=\s*[A-Za-z_][\w.]*"
+    r"^\s*(?:local|const)\s+\w+\s*(?::[^=]+)?=\s*[A-Za-z_][\w.]*"
     r"(?::(?:WaitForChild|FindFirstChild)\(\"\"\)(?:\.[\w.]+)?)*(?:\s*::\s*[\w.?]+)?\s*;?\s*$"
 )
-LOCAL_NAMES = re.compile(r"\blocal\s+(?!function\b)(.+?)(?:(?<![=~<>])=(?!=)|$)")
+LOCAL_NAMES = re.compile(r"\b(?:local|const)\s+(?!function\b)(.+?)(?:(?<![=~<>])=(?!=)|$)")
 FOR_NAMES = re.compile(r"\bfor\s+(.+?)\s+(?:in\b|=)")
 FUNCTION_HEAD = re.compile(r"\bfunction\s*([\w.:]*)\s*(?:<[^>]*>)?\s*\((.*)")
 TYPE_LINE = re.compile(r"^\s*(?:export\s+)?type\s+(\w+)\s*(?:<[^=]*>)?\s*=")
 REMOTE_NEW = re.compile(
-    r"\blocal\s+(\w+)\s*=\s*Instance\.new\(\s*[\"'](?:RemoteEvent|UnreliableRemoteEvent|RemoteFunction)[\"']\s*\)"
+    r"\b(?:local|const)\s+(\w+)\s*=\s*Instance\.new\(\s*[\"'](?:RemoteEvent|UnreliableRemoteEvent|RemoteFunction)[\"']\s*\)"
 )
 REMOTE_NAME = re.compile(r"^\s*(\w+)\.Name\s*=\s*[\"']([^\"']*)[\"']")
 TODO_WORD = re.compile(r"\b(TODO|FIXME|XXX|HACK)\b(.*)")
@@ -70,8 +70,8 @@ DEBUG_TEXT = re.compile(
 )
 COMMENTED_CODE = re.compile(
     r"""^\s*(?:
-        local\s+\w+\s*[:=,] |
-        local\s+function\s+\w+ |
+        (?:local|const)\s+\w+\s*[:=,] |
+        (?:local|const)\s+function\s+\w+ |
         function\s+[\w.:]+\s*\( |
         (?:if|elseif)\s.+\sthen\s*$ |
         (?:for|while)\s.+\sdo\s*$ |
@@ -330,7 +330,7 @@ def order_findings(code_lines, block_at_line, bracket_at_line):
     for number, code in enumerate(code_lines, 1):
         if not code.strip() or block_at_line.get(number, 0) or bracket_at_line.get(number, 0):
             continue
-        is_service = "game:GetService(" in code and re.match(r"^\s*local\s", code)
+        is_service = "game:GetService(" in code and re.match(r"^\s*(?:local|const)\s", code)
         is_require = REQUIRE_LINE.match(code)
         if is_service:
             if other_line:

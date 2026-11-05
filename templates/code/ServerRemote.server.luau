@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MAX_REQUESTS_PER_WINDOW = 5
 local RATE_WINDOW_SECONDS = 1
 local MAX_ITEM_ID_LENGTH = 32
+local MAX_SLOT = 8
 local ALLOWED_ITEMS: { [string]: boolean } = {
 	sword = true,
 	shield = true,
@@ -34,10 +35,6 @@ local function allowRequest(player: Player): boolean
 	return window.count <= MAX_REQUESTS_PER_WINDOW
 end
 
-local function isFiniteNumber(value: unknown): boolean
-	return typeof(value) == "number" and value == value and math.abs(value) ~= math.huge
-end
-
 remote.OnServerEvent:Connect(function(player: Player, itemId: unknown, slot: unknown)
 	if not allowRequest(player) then
 		return
@@ -45,16 +42,15 @@ remote.OnServerEvent:Connect(function(player: Player, itemId: unknown, slot: unk
 	if typeof(itemId) ~= "string" or #itemId > MAX_ITEM_ID_LENGTH or not ALLOWED_ITEMS[itemId] then
 		return
 	end
-	if not isFiniteNumber(slot) then
+	if typeof(slot) ~= "number" or not math.isfinite(slot) then
 		return
 	end
-	local slotNumber = slot :: number
-	if slotNumber ~= math.floor(slotNumber) or slotNumber < 1 or slotNumber > 8 then
+	if slot ~= math.floor(slot) or slot < 1 or slot > MAX_SLOT then
 		return
 	end
 
 	-- Check game rules here, such as ownership, then change server state.
-	remote:FireClient(player, itemId, slotNumber)
+	remote:FireClient(player, itemId, slot)
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player)

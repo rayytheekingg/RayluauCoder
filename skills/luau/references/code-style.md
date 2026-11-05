@@ -74,6 +74,19 @@ Short path aliases such as `local Shared = ReplicatedStorage:WaitForChild("Share
 - Lines stay within 120 characters. **(checked)**
 - Format with StyLua.
 
+## Quality bar
+
+Before calling code finished, it should read well and hold up:
+
+- **Correct:** it handles missing characters, players who leave mid-yield, failed service calls, and being called twice.
+- **Secure:** the server decides everything that matters.
+- **Clear:** a new reader can follow the main path from top to bottom without jumping around.
+- **Small:** no abstraction, option, or dependency that this task doesn't need.
+- **Consistent:** it looks like the code around it.
+- **Clean:** every connection, thread, and table entry has an owner that cleans it up.
+
+Use `const` for values that never change when the project's tools support it. Otherwise use `local`.
+
 ## Examples
 
 ### Early returns

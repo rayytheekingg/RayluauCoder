@@ -1,7 +1,7 @@
 {
   "name": "rayluaucoder",
   "displayName": "RayluauCoder",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Write, check, debug, and test Roblox games in Luau with real API type checking, Studio playtests, neat code rules, a system choosing guide, and templates.",
   "author": {
     "name": "kingrayyy"

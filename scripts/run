@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Finds a working Python 3.8+ and runs a RayluauCoder script.
-# Usage: run check|neat|api-lookup|setup [args]
+# Usage: run check|neat|api-lookup|setup|maintain [args]
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tool="${1:-}"
 shift || true
@@ -10,8 +10,9 @@ case "$tool" in
   neat) file="neat.py" ;;
   api-lookup) file="api_lookup.py" ;;
   setup) file="setup.py" ;;
+  maintain) file="maintain.py" ;;
   *)
-    echo "usage: run check|neat|api-lookup|setup [args]" >&2
+    echo "usage: run check|neat|api-lookup|setup|maintain [args]" >&2
     exit 64
     ;;
 esac

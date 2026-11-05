@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Look up Roblox classes, members and enums in a cached copy of Roblox's API dump.
+"""Look up Roblox classes, members, enums, libraries, and data types.
 
-Exit codes: 0 found, 1 not found, 2 found but deprecated, 3 exists outside the dump.
+Classes and enums come from the live Studio API dump. Libraries, data types, and globals
+come from an index built from Roblox's documentation source (see maintain.py).
+
+Exit codes: 0 found, 1 not found, 2 found but deprecated, 4 could not get the dump.
 """
 import argparse
 import difflib
+import functools
+import gzip
 import json
 import os
 import re
@@ -14,42 +19,53 @@ import time
 import urllib.request
 from pathlib import Path
 
-VERSION_URL = "https://setup.rbxcdn.com/versionQTStudio"
+VERSION_URL = "https://clientsettings.roblox.com/v2/client-version/WindowsStudio64"
 DUMP_URL = "https://setup.rbxcdn.com/{version}-Full-API-Dump.json"
+# A new name, because older versions cached a dump from an address frozen in 2023.
+DUMP_NAME = "Full-API-Dump-live.json"
 DEFINITIONS_URL = "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.None.d.luau"
 DEFINITIONS_NAME = "globalTypes.None.d.luau"
 DOCS = "https://create.roblox.com/docs/reference/engine"
-USER_AGENT = "RayluauCoder/1.0.4"
+DOCS_INDEX = Path(__file__).resolve().parent / "data" / "docs-index.json.gz"
+USER_AGENT = "RayluauCoder/1.0.6"
 MAX_AGE_DAYS = 14
 
-EXIT_FOUND, EXIT_NOT_FOUND, EXIT_DEPRECATED, EXIT_OUTSIDE_DUMP = 0, 1, 2, 3
+EXIT_FOUND, EXIT_NOT_FOUND, EXIT_DEPRECATED, EXIT_NO_DUMP = 0, 1, 2, 4
 
-# The dump only covers engine classes and enums, so these need their own answer.
-LIBRARIES = {
-    "bit32", "buffer", "coroutine", "debug", "math", "os", "string", "table", "task", "utf8", "vector",
-}
-DATATYPES = {
-    "Axes", "BrickColor", "CFrame", "CatalogSearchParams", "Color3", "ColorSequence",
-    "ColorSequenceKeypoint", "Content", "DateTime", "DockWidgetPluginGuiInfo", "EnumItem", "Enums",
-    "Faces", "FloatCurveKey", "Font", "NumberRange", "NumberSequence", "NumberSequenceKeypoint",
-    "OverlapParams", "PathWaypoint", "PhysicalProperties", "RBXScriptConnection", "RBXScriptSignal",
-    "Random", "Ray", "RaycastParams", "RaycastResult", "Rect", "Region3", "Region3int16",
-    "RotationCurveKey", "Secret", "SharedTable", "TweenInfo", "UDim", "UDim2", "Vector2",
-    "Vector2int16", "Vector3", "Vector3int16",
-}
-GLOBALS = {
-    "assert", "collectgarbage", "delay", "elapsedTime", "error", "game", "gcinfo", "getfenv",
-    "getmetatable", "ipairs", "loadstring", "newproxy", "next", "pairs", "pcall", "plugin", "print",
-    "rawequal", "rawget", "rawlen", "rawset", "require", "script", "select", "setfenv", "setmetatable",
-    "settings", "shared", "spawn", "stats", "tick", "time", "tonumber", "tostring", "type", "typeof",
-    "unpack", "version", "wait", "warn", "workspace", "xpcall",
-}
 LEGACY_GLOBALS = {
     "delay": "task.delay",
     "spawn": "task.spawn",
     "tick": "os.clock or workspace:GetServerTimeNow",
     "wait": "task.wait",
 }
+GLOBAL_ALIASES = {"game": "DataModel", "workspace": "Workspace"}
+
+
+@functools.lru_cache(maxsize=1)
+def docs_index():
+    try:
+        with gzip.open(DOCS_INDEX, "rt", encoding="utf-8") as file:
+            return json.load(file)
+    except (OSError, ValueError) as error:
+        print(f"Note: docs index unavailable ({error}). Run scripts/run maintain.", file=sys.stderr)
+        return {"extras": {}, "deprecated": {}, "pages": []}
+
+
+def extras_in_group(*groups):
+    return {name for name, entry in docs_index()["extras"].items() if entry["group"] in groups}
+
+
+def global_names():
+    names = set()
+    for entry in docs_index()["extras"].values():
+        if entry["group"] == "globals":
+            names |= set(entry["members"])
+    return names
+
+
+LIBRARIES = extras_in_group("libraries")
+DATATYPES = extras_in_group("datatypes")
+GLOBALS = global_names()
 
 
 def cache_dir():
@@ -61,7 +77,7 @@ def cache_dir():
 
 
 def dump_path():
-    return cache_dir() / "Full-API-Dump.json"
+    return cache_dir() / DUMP_NAME
 
 
 def fetch(url):
@@ -70,32 +86,32 @@ def fetch(url):
         return response.read()
 
 
-def download():
-    version = fetch(VERSION_URL).decode("ascii").strip()
-    if not re.fullmatch(r"version-[0-9a-f]+", version):
-        raise ValueError(f"unexpected Roblox version string: {version!r}")
-    url = DUMP_URL.format(version=version)
-    print(f"Downloading Roblox API dump {version} from setup.rbxcdn.com ...", file=sys.stderr)
-    raw = fetch(url)
-    json.loads(raw)
-    path = dump_path()
+def write_cache(path, raw):
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
     temp.write_bytes(raw)
     temp.replace(path)
-    (path.parent / "version.txt").write_text(version, encoding="ascii")
     print(f"Cached {len(raw) / 1048576:.1f} MB at {path}", file=sys.stderr)
+
+
+def download():
+    version = json.loads(fetch(VERSION_URL))["clientVersionUpload"]
+    if not re.fullmatch(r"version-[0-9a-f]+", version):
+        raise ValueError(f"unexpected Roblox version string: {version!r}")
+    print(f"Downloading Roblox API dump {version} from setup.rbxcdn.com ...", file=sys.stderr)
+    raw = fetch(DUMP_URL.format(version=version))
+    json.loads(raw)
+    write_cache(dump_path(), raw)
+    (dump_path().parent / "version.txt").write_text(version, encoding="ascii")
 
 
 def download_definitions():
     print("Downloading Roblox type definitions from the luau-lsp repo ...", file=sys.stderr)
-    raw = fetch(DEFINITIONS_URL)
-    path = cache_dir() / DEFINITIONS_NAME
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(".tmp")
-    temp.write_bytes(raw)
-    temp.replace(path)
-    print(f"Cached {len(raw) / 1048576:.1f} MB at {path}", file=sys.stderr)
+    write_cache(cache_dir() / DEFINITIONS_NAME, fetch(DEFINITIONS_URL))
+
+
+def age_in_days(path):
+    return (time.time() - path.stat().st_mtime) / 86400
 
 
 def definitions_path():
@@ -103,9 +119,11 @@ def definitions_path():
     path = cache_dir() / DEFINITIONS_NAME
     if not path.exists():
         download_definitions()
-    age_days = (time.time() - path.stat().st_mtime) / 86400
-    if age_days > MAX_AGE_DAYS:
-        print(f"Note: Roblox definitions are {age_days:.0f} days old. Refresh with api-lookup --update.", file=sys.stderr)
+    elif age_in_days(path) > MAX_AGE_DAYS:
+        try:
+            download_definitions()
+        except (OSError, ValueError) as error:
+            print(f"Note: using old Roblox definitions ({error}).", file=sys.stderr)
     return path
 
 
@@ -115,9 +133,11 @@ def load_dump(allow_download=True):
         if not allow_download:
             return None
         download()
-    age_days = (time.time() - path.stat().st_mtime) / 86400
-    if age_days > MAX_AGE_DAYS:
-        print(f"Note: API dump is {age_days:.0f} days old. Refresh with --update.", file=sys.stderr)
+    elif allow_download and age_in_days(path) > MAX_AGE_DAYS:
+        try:
+            download()
+        except (OSError, ValueError, KeyError) as error:
+            print(f"Note: using an API dump {age_in_days(path):.0f} days old ({error}).", file=sys.stderr)
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -125,18 +145,37 @@ def class_names():
     """Return known class and enum names for check.py, or an empty set when offline."""
     try:
         dump = load_dump()
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, KeyError) as error:
         print(f"Note: API dump unavailable ({error}).", file=sys.stderr)
         return set()
     return {c["Name"] for c in dump["Classes"]} | {f"Enum.{e['Name']}" for e in dump["Enums"]}
 
 
+def deprecated_names():
+    """Return (method name -> owner, class names) for names that are deprecated everywhere they appear."""
+    try:
+        dump = load_dump()
+    except (OSError, ValueError, KeyError) as error:
+        print(f"Note: API dump unavailable ({error}).", file=sys.stderr)
+        return {}, set()
+    active, methods, classes = set(), {}, set()
+    for cls in dump["Classes"]:
+        if "Deprecated" in tag_names(cls):
+            classes.add(cls["Name"])
+        for member in cls.get("Members", []):
+            if "Deprecated" not in tag_names(member):
+                active.add(member["Name"])
+            elif member["MemberType"] == "Function":
+                methods[member["Name"]] = cls["Name"]
+    return {name: owner for name, owner in methods.items() if name not in active}, classes
+
+
 def tag_names(entry):
-    return [t for t in entry.get("Tags", []) if isinstance(t, str)]
+    return [t for t in (entry.get("Tags") or []) if isinstance(t, str)]
 
 
 def preferred(entry):
-    for tag in entry.get("Tags", []):
+    for tag in entry.get("Tags") or []:
         if isinstance(tag, dict) and tag.get("PreferredDescriptorName"):
             return tag["PreferredDescriptorName"]
     return None
@@ -172,6 +211,20 @@ def security_levels(member):
     return sorted({v for v in values if v != "None"})
 
 
+def docs_note(*keys):
+    notes = docs_index()["deprecated"]
+    return next((notes[key] for key in keys if key in notes), "")
+
+
+def report_deprecated(entry, *note_keys):
+    replacement = preferred(entry)
+    print("STATUS: DEPRECATED" + (f". Use {replacement}." if replacement else "."))
+    note = docs_note(*note_keys)
+    if note:
+        print(f"Roblox docs: {note}")
+    return EXIT_DEPRECATED
+
+
 def report_member(owner, member, requested_class):
     print(signature(owner, member))
     if owner != requested_class:
@@ -182,32 +235,13 @@ def report_member(owner, member, requested_class):
     levels = security_levels(member)
     if levels:
         print("Security: " + ", ".join(levels) + " (not callable from normal game scripts)")
-    if "NotScriptable" in tags:
-        print("WARNING: not scriptable.")
     print(f"Docs: {DOCS}/classes/{owner}#{member['Name']}")
     if "Deprecated" in tags:
-        replacement = preferred(member)
-        print("STATUS: DEPRECATED" + (f". Use {replacement}." if replacement else "."))
-        return EXIT_DEPRECATED
-    print("STATUS: OK")
-    return EXIT_FOUND
-
-
-def report_class(cls, classes, show_members):
-    print(f"Class {cls['Name']}" + (f" : {cls['Superclass']}" if cls.get("Superclass") else ""))
-    tags = tag_names(cls)
-    if tags:
-        print("Tags: " + ", ".join(tags))
-    print(f"Docs: {DOCS}/classes/{cls['Name']}")
-    if show_members:
-        for owner, member in chain_members(cls, classes):
-            if "Deprecated" not in tag_names(member) and "Hidden" not in tag_names(member):
-                print("  " + signature(owner, member))
-    if "Deprecated" in tags:
-        replacement = preferred(cls)
-        print("STATUS: DEPRECATED" + (f". Use {replacement}." if replacement else "."))
-        return EXIT_DEPRECATED
-    print("STATUS: OK")
+        return report_deprecated(member, f"{owner}.{member['Name']}", f"{owner}:{member['Name']}")
+    if "NotScriptable" in tags:
+        print("STATUS: NOT SCRIPTABLE. Set it in Studio's Properties window, not from a script.")
+    else:
+        print("STATUS: OK")
     return EXIT_FOUND
 
 
@@ -219,34 +253,75 @@ def chain_members(cls, classes):
         current = classes.get(current.get("Superclass"))
 
 
+def report_class(cls, classes, show_members):
+    print(f"Class {cls['Name']}" + (f" : {cls['Superclass']}" if cls.get("Superclass") else ""))
+    tags = tag_names(cls)
+    if tags:
+        print("Tags: " + ", ".join(tags))
+    print(f"Docs: {DOCS}/classes/{cls['Name']}")
+    if show_members:
+        for owner, member in chain_members(cls, classes):
+            member_tags = tag_names(member)
+            if "Deprecated" not in member_tags and "Hidden" not in member_tags:
+                print("  " + signature(owner, member))
+    if "Deprecated" in tags:
+        return report_deprecated(cls, cls["Name"])
+    print("STATUS: OK")
+    return EXIT_FOUND
+
+
 def not_found(query, candidates):
     lowered = {c.lower(): c for c in candidates}
     matches = difflib.get_close_matches(query.lower(), list(lowered), n=5, cutoff=0.6)
-    print(f"STATUS: NOT FOUND: {query} is not in the API dump. Names are case-sensitive.")
+    print(f"STATUS: NOT FOUND: {query} does not exist in the current API. Names are case-sensitive.")
     if matches:
         print("Did you mean: " + ", ".join(lowered[m] for m in matches))
     return EXIT_NOT_FOUND
 
 
-def outside_dump(name):
-    if name in LIBRARIES:
-        url = f"{DOCS}/libraries/{name}"
-        kind = "library"
-    elif name in DATATYPES:
-        url = f"{DOCS}/datatypes/{name}"
-        kind = "data type"
-    elif name in GLOBALS:
-        url = "https://create.roblox.com/docs/reference/engine/globals/RobloxGlobals"
-        kind = "global"
-    else:
-        return None
-    print(f"{name} is a {kind}. The API dump does not list its members.")
-    print(f"Verify in the docs: {url}")
-    if name in LEGACY_GLOBALS:
-        print(f"STATUS: DEPRECATED STYLE. Use {LEGACY_GLOBALS[name]}.")
+def group_docs_url(name, entry):
+    if entry["group"] == "globals":
+        return f"{DOCS}/globals/{name}"
+    return f"{DOCS}/{entry['group']}/{name}"
+
+
+def report_extra_member(full_name, info, url):
+    print(f"{info['kind'].rstrip('s').capitalize()} {full_name}")
+    print(f"Docs: {url}")
+    if info.get("deprecated"):
+        print("STATUS: DEPRECATED")
+        print(f"Roblox docs: {info['deprecated']}")
         return EXIT_DEPRECATED
-    print("STATUS: OUTSIDE DUMP")
-    return EXIT_OUTSIDE_DUMP
+    print("STATUS: OK")
+    return EXIT_FOUND
+
+
+def lookup_global(name):
+    for group_name, entry in docs_index()["extras"].items():
+        if entry["group"] == "globals" and name in entry["members"]:
+            url = group_docs_url(group_name, entry)
+            if name in LEGACY_GLOBALS:
+                print(f"Global {name}\nDocs: {url}\nSTATUS: DEPRECATED. Use {LEGACY_GLOBALS[name]}.")
+                return EXIT_DEPRECATED
+            return report_extra_member(name, entry["members"][name], url)
+    return None
+
+
+def lookup_extra(parts):
+    """Answer for a library or data type. Returns None when the name isn't one."""
+    entry = docs_index()["extras"].get(parts[0])
+    if not entry or entry["group"] == "globals":
+        return None
+    url = group_docs_url(parts[0], entry)
+    if len(parts) == 1:
+        names = sorted(re.split(r"[.:]", name)[-1] for name in entry["members"])
+        print(f"{parts[0]} is a {entry['group'].rstrip('s').replace('librarie', 'library')}: " + ", ".join(names))
+        print(f"Docs: {url}\nSTATUS: OK")
+        return EXIT_FOUND
+    for full_name, info in entry["members"].items():
+        if re.split(r"[.:]", full_name)[-1] == parts[1]:
+            return report_extra_member(full_name, info, f"{url}#{parts[1]}")
+    return not_found(".".join(parts), entry["members"])
 
 
 def lookup_enum(parts, enums):
@@ -281,6 +356,21 @@ def search_member(name, classes):
     return hits
 
 
+def lookup_single(name, classes, enums, show_members):
+    if name in classes:
+        return report_class(classes[name], classes, show_members)
+    if name in enums:
+        return lookup_enum(["Enum", name], enums)
+    for answer in (lookup_extra([name]), lookup_global(name)):
+        if answer is not None:
+            return answer
+    if search_member(name, classes):
+        print("STATUS: OK (member name exists on the classes above)")
+        return EXIT_FOUND
+    members = {m["Name"] for c in classes.values() for m in c.get("Members", [])}
+    return not_found(name, set(classes) | members | LIBRARIES | DATATYPES | GLOBALS)
+
+
 def lookup(query, dump, show_members):
     classes = {c["Name"]: c for c in dump["Classes"]}
     enums = {e["Name"]: e for e in dump["Enums"]}
@@ -289,41 +379,28 @@ def lookup(query, dump, show_members):
         return not_found(query, classes)
     if parts[0] == "Enum":
         return lookup_enum(parts, enums)
-    if parts[0] == "Instance" and parts[1:] in (["new"], ["fromExisting"]):
-        print(f"Instance.{parts[1]} is a constructor, documented at {DOCS}/datatypes/Instance")
-        print("STATUS: OK")
-        return EXIT_FOUND
-
-    cls = classes.get(parts[0])
     if len(parts) == 1:
-        if cls:
-            return report_class(cls, classes, show_members)
-        if parts[0] in enums:
-            return lookup_enum(["Enum", parts[0]], enums)
-        answer = outside_dump(parts[0])
-        if answer is not None:
-            return answer
-        if search_member(parts[0], classes):
-            print("STATUS: OK (member name exists on the classes above)")
-            return EXIT_FOUND
-        members = {m["Name"] for c in classes.values() for m in c.get("Members", [])}
-        return not_found(parts[0], set(classes) | members)
+        return lookup_single(parts[0], classes, enums, show_members)
 
-    if not cls:
-        answer = outside_dump(parts[0])
-        if answer is not None:
-            return answer
-        return not_found(parts[0], classes)
-    chain = list(chain_members(cls, classes))
-    for owner, member in chain:
-        if member["Name"] == parts[1]:
-            return report_member(owner, member, cls["Name"])
-    return not_found(f"{parts[0]}.{parts[1]}", {f"{parts[0]}.{m['Name']}" for _, m in chain})
+    head = GLOBAL_ALIASES.get(parts[0], parts[0])
+    cls = classes.get(head)
+    if cls:
+        chain = list(chain_members(cls, classes))
+        for owner, member in chain:
+            if member["Name"] == parts[1]:
+                return report_member(owner, member, cls["Name"])
+        if head in docs_index()["extras"]:
+            return lookup_extra([head, parts[1]])
+        return not_found(f"{head}.{parts[1]}", {f"{head}.{m['Name']}" for _, m in chain})
+    answer = lookup_extra([head, parts[1]])
+    if answer is not None:
+        return answer
+    return not_found(head, set(classes) | LIBRARIES | DATATYPES)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verify Roblox APIs against a cached API dump.")
-    parser.add_argument("query", nargs="?", help="Part, Part.Anchored, Instance:Destroy, Enum.Material.Plastic")
+    parser = argparse.ArgumentParser(description="Verify Roblox APIs against the live API dump and Roblox's docs.")
+    parser.add_argument("query", nargs="?", help="Part, Part.Anchored, task.wait, Vector3.new, Enum.Material.Plastic")
     parser.add_argument("--members", action="store_true", help="list current members of a class")
     parser.add_argument("--update", action="store_true", help="download the latest dump")
     args = parser.parse_args()
@@ -337,10 +414,10 @@ def main():
         if not args.query:
             return EXIT_FOUND
         dump = load_dump()
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, KeyError) as error:
         print(f"ERROR: cannot get the API dump: {error}", file=sys.stderr)
         print("STATUS: UNVERIFIED. Do not treat the API as confirmed.")
-        return 4
+        return EXIT_NO_DUMP
     return lookup(args.query, dump, args.members)
 
 

@@ -34,3 +34,17 @@ Use this when code runs without an obvious error but behaves incorrectly. Check 
 | Comparing floats fails | Rounding error | Compare with a small tolerance |
 | Time differs between clients | Client clocks vary | Use `workspace:GetServerTimeNow()` |
 | Code uses a removed API from an old tutorial | The tutorial is outdated | Run `api-lookup` and use the listed replacement |
+| A flag is still old right after firing an event | Deferred events haven't run yet | Yield with `task.wait`, or restructure so the handler does the next step |
+| Children are missing in a `Destroying` handler | Deferred handlers run after the change | Read what you need before calling `Destroy` |
+| Stats don't show on the leaderboard | The folder isn't named exactly `leaderstats` | Use all lowercase |
+| A character holds a tool by the wrong part | The tool has several parts named `Handle` | Keep exactly one `Handle` |
+| A `ProximityPrompt` works while disabled | Clients can fire it anyway | Check state and distance on the server |
+| A speed change isn't detected by the server | `Humanoid.WalkSpeed` changes locally and fires no events | Check movement on the server |
+| Saved metadata disappears | A write omitted the metadata | Pass metadata on every write to that key |
+| A value read right after saving looks old | `GetAsync` caches for 4 seconds | Pass `DataStoreGetOptions` with `UseCache` set to false |
+| A paid item is given for free after a crash | The grant wasn't saved before `PurchaseGranted` | Return it only after the save succeeds |
+| `RemoteEvent` and `RemoteFunction` calls arrive out of order | Their relative order isn't guaranteed | Use one type, or add sequence numbers |
+| A collision group isn't registered yet | Several scripts set up groups, in a race | Register all groups in one script |
+| Highlights stop appearing | The 255 slots are used up, including disabled ones | Delete unused highlights |
+| A part moves faster and faster | `VectorForce` and `Torque` apply constant force | Use `LinearVelocity` or `AngularVelocity` for steady speed |
+| A chat UI can't read message text | Platform-integrated chat hides message content | Use `TextChannelWindow` and `TextChatCommand` |

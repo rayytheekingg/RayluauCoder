@@ -47,23 +47,22 @@ CODE_RULES = [
     (r"(?<![\w.:])(getfenv|setfenv)\s*\(", "getfenv and setfenv disable Luau optimizations."),
     (r"(?<![\w.:])loadstring\s*\(", "loadstring is risky and disabled by default."),
     (r":(connect|disconnect)\s*\(", "Lowercase signal methods are deprecated. Use :Connect or :Disconnect."),
-    (r":Remove\s*\(", "Instance:Remove is deprecated. Use :Destroy."),
-    (r":(SetPrimaryPartCFrame)\s*\(", "SetPrimaryPartCFrame is deprecated. Use :PivotTo."),
-    (r":(GetPrimaryPartCFrame)\s*\(", "GetPrimaryPartCFrame is deprecated. Use :GetPivot."),
-    (r":FindPartOnRay\w*\s*\(", "FindPartOnRay is deprecated. Use workspace:Raycast."),
-    (r":FindPartsInRegion3\w*\s*\(", "FindPartsInRegion3 is deprecated. Use workspace:GetPartBoundsInBox."),
     (r"[Hh]umanoid:LoadAnimation\s*\(", "Humanoid:LoadAnimation is deprecated. Use Animator:LoadAnimation."),
     (r"\.KeyDown\b|\.KeyUp\b", "Mouse key events are deprecated. Use UserInputService."),
     (r"Instance\.new\s*\(\s*\"\"\s*,", "Set Parent last. Do not use the Instance.new parent argument."),
     (r":InvokeClient\s*\(", "InvokeClient can hang the server. Use RemoteEvents."),
 ]
-# These rules need the string contents.
-TEXT_RULES = [
-    (
-        r"Instance\.new\s*\(\s*[\"'](Body\w+|RocketPropulsion|Message|Hint|Hat)[\"']",
-        "Deprecated class. Check it with api-lookup and use the listed replacement.",
-    ),
-]
+METHOD_CALL = re.compile(r":([A-Z]\w+)\s*\(")
+INSTANCE_NEW = re.compile(r"Instance\.new\s*\(\s*[\"'](\w+)[\"']")
+SELENE_STD_FIELD = re.compile(r"standard library global `(\w+)` does not contain the field `(\w+)`")
+# Deprecated Roblox names that game code is likely to reuse for its own methods.
+COMMON_METHOD_NAMES = {
+    "CreateModel", "FireEvent", "GetAnimations", "GetAxis", "GetCell", "GetCollection", "GetContents",
+    "GetErrorMessage", "GetInventory", "GetItemDetails", "GetMessage", "GetModel", "GetParticipants", "GetRootPart",
+    "GetString", "GetValue", "Insert", "Interpolate", "InvokeAsync", "IsDisabled", "Leave", "LoadData", "LoadString",
+    "OnUpdate", "Reset", "SaveData", "SaveString", "Sense", "SetAxis", "SetCell", "SetCells", "SetContents", "SetEntry",
+    "SetValue", "Start", "Stop", "Update",
+}
 
 
 def run_tool(command, cwd=None):
@@ -281,10 +280,20 @@ def run_selene(exe, target):
     if not config_dir:
         command += ["--config", str(TEMPLATE / "selene.toml")]
     code, output = run_tool([*command, str(target)], cwd=config_dir)
-    problems = [line for line in output.splitlines() if re.search(r"\b(warning|error)\[", line)]
-    if code != 0 and not problems:
+    found = [line for line in output.splitlines() if re.search(r"\b(warning|error)\[", line)]
+    problems = [line for line in found if not is_outdated_selene_std(line)]
+    if code != 0 and not found:
         problems = [line for line in output.splitlines() if line.strip()] or [f"selene exited with {code}"]
     return problems, "" if config_dir else "used the template selene.toml"
+
+
+def is_outdated_selene_std(line):
+    """selene's Roblox library can lag behind. Roblox's docs decide whether a library member is real."""
+    match = SELENE_STD_FIELD.search(line)
+    if not match:
+        return False
+    library, field = match.groups()
+    return f"{library}.{field}" in api_lookup.docs_index()["extras"].get(library, {}).get("members", {})
 
 
 def run_stylua(exe, target):
@@ -310,14 +319,20 @@ def strip_line(line):
 
 def scan_deprecated(files):
     problems = []
+    methods, classes = api_lookup.deprecated_names()
     for path in files:
         text = path.read_text(encoding="utf-8", errors="replace")
         for number, line in enumerate(blank_long_blocks(text).splitlines(), 1):
-            if line.lstrip().startswith("--"):
+            if line.lstrip().startswith("--") or "neat: ignore" in line:
                 continue
             code = strip_line(line)
             hits = [advice for pattern, advice in CODE_RULES if re.search(pattern, code)]
-            hits += [advice for pattern, advice in TEXT_RULES if re.search(pattern, line)]
+            for name in METHOD_CALL.findall(code):
+                if name in methods and name not in COMMON_METHOD_NAMES:
+                    hits.append(f"{methods[name]}:{name} is deprecated. Run api-lookup for the replacement.")
+            for name in INSTANCE_NEW.findall(line):
+                if name in classes:
+                    hits.append(f"{name} is a deprecated class. Run api-lookup for the replacement.")
             problems += [f"{path}:{number}: {advice}" for advice in hits]
     return problems, "built-in pattern scan; it does not check syntax or types"
 
