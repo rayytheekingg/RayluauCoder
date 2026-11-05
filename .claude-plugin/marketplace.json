@@ -1,0 +1,14 @@
+{
+  "name": "rayluau",
+  "description": "RayluauCoder: Roblox and Luau development tools for Claude Code",
+  "owner": {
+    "name": "kingrayyy"
+  },
+  "plugins": [
+    {
+      "name": "rayluaucoder",
+      "source": "./",
+      "description": "Write, check, debug, and test Roblox games in Luau"
+    }
+  ]
+}

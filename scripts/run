@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Finds a working Python 3.8+ and runs a RayluauCoder script.
+# Usage: run check|neat|api-lookup|setup [args]
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+tool="${1:-}"
+shift || true
+
+case "$tool" in
+  check) file="check.py" ;;
+  neat) file="neat.py" ;;
+  api-lookup) file="api_lookup.py" ;;
+  setup) file="setup.py" ;;
+  *)
+    echo "usage: run check|neat|api-lookup|setup [args]" >&2
+    exit 64
+    ;;
+esac
+
+# The Windows "python" Store alias exists but does not run, so test each candidate.
+for py in "py -3" python3 python; do
+  if $py -c "import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)" >/dev/null 2>&1; then
+    PYTHONUTF8=1 PYTHONDONTWRITEBYTECODE=1 exec $py "$here/$file" "$@"
+  fi
+done
+
+echo "RayluauCoder needs Python 3.8 or newer: https://www.python.org/downloads/" >&2
+exit 127
