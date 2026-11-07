@@ -1,3 +1,66 @@
+# Ray Luau Coder
+
+Version 2.1.0, verified against Roblox and Luau as of 2026-11-06.
+
+A Claude skill for writing, reviewing and fixing Roblox code, and for designing Roblox UI and bright studded maps. It keeps Claude on current APIs, server-authoritative security, safe DataStore and purchase handling, one clean coding standard, and one design system.
+
+## What it does
+
+- **Write**: new scripts, modules, services and Studio plugins from tested templates.
+- **Review**: runs a pass/fail checklist and reports findings ranked Critical, High, Medium, Low.
+- **Fix**: corrects deprecated APIs, security holes, data-loss risks, performance problems, type errors and style, with the smallest safe diff and a ranked change list.
+- **Design UI**: themed, scale-based UI (Studded Classic, Candy Pop, Neon Night) that works on touch, mouse and gamepad, with free licensed icons packed into atlases.
+- **Build maps**: stud parts, checkered floors, seeded obby sections, lighting presets, and map review checklists.
+
+## Contents
+
+```
+ray-luau-coder/
+  SKILL.md                 core rules, workflows, indexes (read first)
+  README.md
+  CHANGELOG.md             version history, unverified items, sources, update procedure
+  references/              17 topic files (language, runtime, security, data, input, monetization,
+                           performance, tooling, Studio plugins, deprecations, clean-code standard,
+                           UI design, UI style guide, icons, map building, lighting presets, design workflow)
+  templates/               lint-clean Luau templates, palettes and project configs
+  tools/                   build_icon_atlas.py, check_contrast.py
+  checklists/              code-review, fix-workflow, ui-review, map-review
+  research/                approved reference catalog, palette preview, whats-new, design cheat sheet,
+                           coding sources, index (research/README.md)
+```
+
+## Install
+
+**Claude (app)**: zip the `ray-luau-coder` folder and upload it as a skill in Claude's skill settings.
+
+**Claude Code**: copy the folder to `~/.claude/skills/ray-luau-coder/` for all projects, or `.claude/skills/ray-luau-coder/` inside one project.
+
+Then just ask for Roblox work ("write a coin pickup system", "fix this DataStore script"). The skill triggers on Roblox, Luau, Studio, DataStore, RemoteEvent, Rojo and related terms.
+
+## What's new in 2.1.0
+
+- UI system: Theme tokens and 3 palettes (all pass WCAG contrast), UIKit components, MenuManager with gamepad and Back support, a full server-validated shop example.
+- Icons: approved free sets with licenses, a CREDITS template, and an atlas builder that outputs a sprite sheet plus IconAtlas.luau.
+- Maps: stud building helpers, seeded obby generator, kill bricks and checkpoints, 4 lighting presets, map review checklist.
+- Built on current Roblox features: UI Styling, StyleQuery, Styling Transitions, UIShadow, Unified Lighting, Procedural Models, Device Simulator.
+
+## What's new in 2.0.0
+
+- Rewritten for the 2026 engine: New Type Solver, require-by-string, Server Authority, Input Action System, unified DataStore limits, BindReceiptHandler, new spatial query filters, Studio built-in MCP server.
+- Deprecation table built from the deprecation flags in the Roblox API definitions, plus 2026 removals from Roblox announcements.
+- New templates: session-locked PlayerData, idempotent ProcessReceipt, RemoteHandler with rate limiting, Cleaner, Remotes, init/start bootstrap.
+- All templates pass luau-lsp (old and new solver), Selene and StyLua.
+
+See CHANGELOG.md for details and the items still marked unverified.
+
+## Keeping it current
+
+Follow the update procedure at the bottom of CHANGELOG.md. A refresh every 2 to 3 months keeps the deprecation table and limits current.
+
+---
+
+# RayluauCoder plugin (previous README, kept)
+
 # RayluauCoder
 
 A Claude Code plugin that helps Claude write, check, and debug Roblox games in Luau.
