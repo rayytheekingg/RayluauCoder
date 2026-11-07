@@ -1,0 +1,32 @@
+{
+  "StuddedClassic": {
+    "primary": "#1E63D6", "onPrimary": "#FFFFFF",
+    "secondary": "#1A7F34", "onSecondary": "#FFFFFF",
+    "accent": "#FFC21A", "onAccent": "#1B1B1B",
+    "success": "#2BB24C", "onSuccess": "#0E2A14",
+    "danger": "#E23B2E", "onDanger": "#FFFFFF",
+    "bg0": "#16202E", "bg1": "#1F2C40", "bg2": "#2A3A55",
+    "text": "#FFFFFF", "textMuted": "#C3CEE2",
+    "stroke": "#0B111A", "studTint": "#FFFFFF"
+  },
+  "CandyPop": {
+    "primary": "#C2185B", "onPrimary": "#FFFFFF",
+    "secondary": "#6A3DE8", "onSecondary": "#FFFFFF",
+    "accent": "#00B3C7", "onAccent": "#0B2A30",
+    "success": "#2ECC71", "onSuccess": "#0B2E1A",
+    "danger": "#FF5A5F", "onDanger": "#3A0A0C",
+    "bg0": "#FFF5FA", "bg1": "#FFE6F2", "bg2": "#FFD6EA",
+    "text": "#341A45", "textMuted": "#5E3F72",
+    "stroke": "#E8A3C6", "studTint": "#FFFFFF"
+  },
+  "NeonNight": {
+    "primary": "#00E5FF", "onPrimary": "#04141A",
+    "secondary": "#B14CFF", "onSecondary": "#12051C",
+    "accent": "#39FF88", "onAccent": "#04190C",
+    "success": "#39FF88", "onSuccess": "#04190C",
+    "danger": "#FF3B6B", "onDanger": "#1A0309",
+    "bg0": "#0A0D18", "bg1": "#121829", "bg2": "#1C2440",
+    "text": "#F2F6FF", "textMuted": "#A9B4D0",
+    "stroke": "#2E3A63", "studTint": "#B14CFF"
+  }
+}

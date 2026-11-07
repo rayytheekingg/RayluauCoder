@@ -1,0 +1,9 @@
+# Selene 0.32.0 config for Roblox projects. Run: selene src/
+std = "roblox"
+
+[rules]
+global_usage = "deny"
+unused_variable = "warn"
+shadowing = "warn"
+deprecated = "warn"
+incorrect_standard_library_use = "deny"
